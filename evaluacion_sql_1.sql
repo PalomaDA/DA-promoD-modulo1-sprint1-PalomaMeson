@@ -48,6 +48,8 @@ CREATE TABLE `stats`(
     `pfd` FLOAT,
     `plus_minus` FLOAT,
     PRIMARY KEY (`id_stat_team_season`));
+    
+-- la creamos sin las primary key de entrada para añadirlas después para facilitar la inserción de los datos ante posibles incongruencias
 
 # Una vez tenemos las tablas podemos comenzar a insertar los datos facilitados
 INSERT INTO `stats` (`id_stat_team_season`,`team_id`,`season_id`, `gp`, `w`, `l`,`win_percent`,`minutes`,`pts`,`fgm`,`fga`,`fg_percent`,`three_pm`,`three_pa`,`three_point_percent`,`ftm`,`fta`,`fta_percent`,`oreb`,`dreb`,`reb`,`ast`,`tov`,`stl`,`blk`,`blka`, `pf`,`pfd`,`plus_minus`)
@@ -247,15 +249,34 @@ ADD CONSTRAINT `fk_stats_team`
 	FOREIGN KEY (`team_id`)
 	REFERENCES `teams` (`team_id`) ON DELETE CASCADE ON UPDATE CASCADE;
   
- /* No se pueden insertar sin más los datos de la tabla stats, la columna season_id difiere de la de la tabla seasons, habiendo algunos nº de id extra. 
-Esto puede deberse a que en la tabla de stats esten incluidos datos de otras temporadas. Como nos interesan las 4 temporadas solicitadas por nuestro cliente
-lo que hacemos es eliminar aquellos datos que estan de más */
+ /* No se puede crear sin más el enlace entre las tablas seasons y stats porque hay una incongruencia en los datos entre ellas: la columna season_id difiere en la tabla stats tiene nº de id extra. 
+Esto puede deberse a que en la tabla de stats esten incluidos datos de otras temporadas que no este en la tabla seasons. */
 
+-- Este problema lo podemos solucionar de dos maneras, bien eliminando los datos de las temporadas que no tenemos en la tabla seasons, o bien creando en ésta las nuevas temporadas.
+
+ 
+ /* Si nos interesaran solo las 4 temporadas existentes en la tabla seasons, lo que haríamos sería el eliminar aquellos datos que estan de más con: */
 DELETE FROM `stats`
 WHERE `season_id` NOT IN (140409122677552, 140409122677808, 140409122678320, 140409122678576);
 
--- Y una vez eliminados los datos erroneos ya si podemos crear la segunda foreign key que une las tablas stats y seasns
+-- Y una vez eliminados los datos erroneos ya si podemos crear la segunda foreign key que une las tablas stats y seasons
 
+-- Por el contrario, si lo que preferimos es añadir las temporadas faltantes en la tabla seasons, primero tendremos que comrpobar cuales estan en una y no en la otra:
+
+SELECT DISTINCT `season_id`
+FROM `stats`
+WHERE `season_id` NOT IN (140409122677552, 140409122677808, 140409122678320, 140409122678576);
+-- Solo hay un ID extra: '140409122678064'
+
+-- Al fijarnos en la tabla seasons vemos que hay un periodo faltante, el que corresponde a los años '2018-2019'
+SELECT *
+FROM seasons;
+
+-- Podemos insertar los nuevos datos en la tabla
+INSERT INTO `seasons` (`season_id`, `season`)
+VALUES (140409122678064, '2018-2019');
+
+-- Y una vez añadidos los datos ya podemos crear nuestra foreign key
 ALTER TABLE `stats`
 ADD CONSTRAINT `fk_stats_seas`
 	FOREIGN KEY (`season_id`)
@@ -263,8 +284,10 @@ ADD CONSTRAINT `fk_stats_seas`
 
 /*  Una vez tenemos todas las tablas con sus datos y relacionadas entre ellas, empezamos con las consultas: */
 
+------------------------------------------------------------------------------------------------------------------------------------------------------------
 
---  1. Selecciona las victorias máximas y mínimas para cada equipo diferente en la tabla de ¡seasons! (¿quiere decir de stats, seasons no hace referencia a los equipos?).
+--  1. Selecciona las victorias máximas y mínimas para cada equipo diferente en la tabla de **seasons** 
+-- (¿quiere decir de stats, seasons no hace referencia a los equipos?). TRABAJAMOS CON LA TABLA STATS
 
 SELECT `team_id`, MAX(`w`) AS `max_wins`, MIN(`w`) AS `min_wins`
 FROM `stats`
@@ -291,12 +314,14 @@ FROM `teams`;
 
 # El numero total de equipos es 30.
 
+
 -- 5. Calcula la media de todos los puntos conseguidos de la tabla stats
 
 SELECT AVG(`pts`)
 FROM `stats`;
 
 # La media de todos los puntos obtenidos en al tabla stats es de 108.92416693369547.
+
 
 -- 6. Selecciona el máximo de victorias, máximo de puntos y la diferencia entre el máximo de puntos con la media de puntos como diferencia_media de la tabla stats.
 
